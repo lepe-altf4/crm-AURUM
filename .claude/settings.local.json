@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(curl -s -H 'Authorization: Bearer sbp_db34fb68f361ff861c5f2ef8e76de39f36b54e33' https://api.supabase.com/v1/projects)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -H \"Authorization: Bearer sbp_db34fb68f361ff861c5f2ef8e76de39f36b54e33\" https://api.supabase.com/v1/projects)"
+    ]
+  }
+}
