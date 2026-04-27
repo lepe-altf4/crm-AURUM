@@ -1,16 +1,23 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Drawer from '@/components/ui/drawer'
 import Icon from '@/components/ui/icon'
 import { StageBadge } from '@/components/ui/badge'
-import ActivityTimeline from '@/components/activities/activity-timeline'
 import type { InventoryItem, Contact } from '@/lib/types'
 
 const STATUS_LABEL = { available: 'Disponible', reserved: 'Reservado', sold: 'Vendido' } as const
 const STATUS_BADGE_CLASS = { available: 'badge badge-gold', reserved: 'badge badge-white', sold: 'badge badge-mute' }
+
+// #6 — formato estricto U$S 000.000
+function fmtUSD(n: number) {
+  return 'U$S ' + Math.round(n).toLocaleString('es-AR')
+}
+function fmtARS(n: number, fx: number) {
+  return '$ ' + Math.round(n * fx).toLocaleString('es-AR')
+}
 
 interface Props {
   initialInventory: InventoryItem[]
@@ -30,6 +37,13 @@ export default function StockManager({ initialInventory, contacts }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [addForm, setAddForm] = useState({ brand: '', model: '', year: '2025', km: '0', price: '0', status: 'available' })
   const [saving, setSaving] = useState(false)
+  // #5 — tipo de cambio desde localStorage
+  const [fx, setFx] = useState(1200)
+
+  useEffect(() => {
+    const stored = localStorage.getItem('aurum_fx')
+    if (stored) setFx(Number(stored))
+  }, [])
 
   const brands = useMemo(() => Array.from(new Set(items.map(u => u.brand))).sort(), [items])
 
@@ -64,7 +78,7 @@ export default function StockManager({ initialInventory, contacts }: Props) {
       .insert({ ...addForm, year: +addForm.year, km: +addForm.km, price: +addForm.price })
       .select()
       .single()
-    if (data) setItems(prev => [data, ...prev])
+    if (data) setItems(prev => [data as InventoryItem, ...prev])
     setAddForm({ brand: '', model: '', year: '2025', km: '0', price: '0', status: 'available' })
     setAddOpen(false)
     setSaving(false)
@@ -82,9 +96,7 @@ export default function StockManager({ initialInventory, contacts }: Props) {
     return (
       <div className="thumb">
         <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 13l2-6h14l2 6" />
-          <path d="M3 13v5h2v-2h14v2h2v-5" />
-          <path d="M3 13h18" />
+          <path d="M3 13l2-6h14l2 6" /><path d="M3 13v5h2v-2h14v2h2v-5" /><path d="M3 13h18" />
         </svg>
       </div>
     )
@@ -128,14 +140,14 @@ export default function StockManager({ initialInventory, contacts }: Props) {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: 76 }}></th>
-                  <th>Marca</th>
-                  <th>Modelo</th>
-                  <th>Año</th>
-                  <th>KM</th>
-                  <th>Precio</th>
-                  <th>Estado</th>
-                  <th style={{ textAlign: 'right' }}>Acciones</th>
+                  <th style={{ width: 76 }} />
+                  <th style={{ fontWeight: 600 }}>Marca</th>
+                  <th style={{ fontWeight: 600 }}>Modelo</th>
+                  <th style={{ fontWeight: 600 }}>Año</th>
+                  <th style={{ fontWeight: 600 }}>KM</th>
+                  <th style={{ fontWeight: 600 }}>Precio USD</th>
+                  <th style={{ fontWeight: 600 }}>Estado</th>
+                  <th style={{ textAlign: 'right', fontWeight: 600 }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -146,11 +158,14 @@ export default function StockManager({ initialInventory, contacts }: Props) {
                     <td className="muted">{u.model}</td>
                     <td className="muted tabular">{u.year}</td>
                     <td className="muted tabular">{u.km.toLocaleString('es-AR')}</td>
-                    <td className="tabular" style={{ fontWeight: 500 }}>US${u.price.toLocaleString('en-US')}</td>
+                    {/* #6 — formato U$S 000.000 + ARS abajo en gris */}
+                    <td className="tabular">
+                      <div style={{ fontWeight: 600 }}>{fmtUSD(u.price)}</div>
+                      <div style={{ fontSize: 10, color: '#999', marginTop: 1 }}>{fmtARS(u.price, fx)}</div>
+                    </td>
                     <td>
                       <span className={STATUS_BADGE_CLASS[u.status]}>
-                        <span className="dot" />
-                        {STATUS_LABEL[u.status]}
+                        <span className="dot" />{STATUS_LABEL[u.status]}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
@@ -185,7 +200,6 @@ export default function StockManager({ initialInventory, contacts }: Props) {
             </>
           }
         >
-          {/* Hero image placeholder */}
           <div style={{ height: 180, borderRadius: 8, marginBottom: 18, background: 'linear-gradient(135deg,#181818,#0d0d0d)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden', backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 6px, transparent 6px 14px)', display: 'grid', placeItems: 'center', color: 'var(--text-mute)', fontSize: 11 }}>
             <div style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.1em' }}>[ FOTO DEL VEHÍCULO ]</div>
             <div style={{ position: 'absolute', top: 12, right: 12 }}>
@@ -195,16 +209,17 @@ export default function StockManager({ initialInventory, contacts }: Props) {
 
           <div className="card" style={{ marginBottom: 18, padding: '4px 16px' }}>
             {[
-              ['Año', drawerItem.year],
+              ['Año', String(drawerItem.year)],
               ['Kilometraje', `${drawerItem.km.toLocaleString('es-AR')} km`],
-              ['Precio', `US$${drawerItem.price.toLocaleString('en-US')}`],
+              ['Precio USD', fmtUSD(drawerItem.price)],
+              ['Precio ARS', fmtARS(drawerItem.price, fx)],
               ['Transmisión', 'Automática'],
               ['Combustible', 'Gasolina premium'],
               ['VIN', `WP0AB2A99${drawerItem.id.slice(0, 8).toUpperCase()}`],
             ].map(([k, v]) => (
-              <div className="spec-row" key={k as string}>
+              <div className="spec-row" key={k}>
                 <span className="k">{k}</span>
-                <span className="v" style={k === 'Precio' ? { color: 'var(--gold)' } : undefined}>{v}</span>
+                <span className="v" style={k === 'Precio USD' ? { color: 'var(--gold)' } : k === 'Precio ARS' ? { color: '#999' } : undefined}>{v}</span>
               </div>
             ))}
           </div>

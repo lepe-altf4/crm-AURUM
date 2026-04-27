@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Icon from '@/components/ui/icon'
@@ -22,12 +22,22 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
   const [commAdmin, setCommAdmin] = useState(0.5)
   const [commCloser, setCommCloser] = useState(3.5)
   const [commAuto, setCommAuto] = useState(true)
+  // #5 — tipo de cambio
+  const [exchangeRate, setExchangeRate] = useState(1200)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<{ name: string; email: string; role: 'Admin' | 'Closer' } | null>(null)
   const [dragStageId, setDragStageId] = useState<string | null>(null)
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
+  // #3 — per-stage save feedback
+  const [stageSaved, setStageSaved] = useState<Record<string, boolean>>({})
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Load persisted exchange rate
+  useEffect(() => {
+    const stored = localStorage.getItem('aurum_fx')
+    if (stored) setExchangeRate(Number(stored))
+  }, [])
 
   function openEdit(p: Profile) {
     setEditingId(p.id)
@@ -50,6 +60,13 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
     startTransition(() => router.refresh())
   }
 
+  // #3 — save stage name on blur with green check feedback
+  async function saveStage(id: string, name: string) {
+    await supabase.from('pipeline_stages').update({ name }).eq('id', id)
+    setStageSaved(prev => ({ ...prev, [id]: true }))
+    setTimeout(() => setStageSaved(prev => ({ ...prev, [id]: false })), 2000)
+  }
+
   function onStageDragStart(id: string) { setDragStageId(id) }
   function onStageDragOver(e: React.DragEvent, id: string) { e.preventDefault(); setDropTargetId(id) }
   function onStageDrop(e: React.DragEvent, id: string) {
@@ -61,7 +78,7 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
       const to = arr.findIndex(s => s.id === id)
       const [moved] = arr.splice(from, 1)
       arr.splice(to, 0, moved)
-      return arr.map((s, i) => ({ ...s, order: i + 1 }))
+      return arr.map((s, i) => ({ ...s, position: i + 1 }))
     })
     setDragStageId(null)
     setDropTargetId(null)
@@ -69,10 +86,12 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
 
   async function saveAll() {
     setSaving(true)
-    // Save stage order
+    // Save stage order and names
     await Promise.all(
-      stages.map((s, i) => supabase.from('pipeline_stages').update({ position: i + 1 }).eq('id', s.id))
+      stages.map((s, i) => supabase.from('pipeline_stages').update({ position: i + 1, name: s.name }).eq('id', s.id))
     )
+    // Persist exchange rate to localStorage
+    localStorage.setItem('aurum_fx', String(exchangeRate))
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 1800)
@@ -102,11 +121,11 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
             <table className="table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Email</th>
-                  <th>Rol</th>
-                  <th>Estado</th>
-                  <th style={{ textAlign: 'right' }}></th>
+                  <th style={{ fontWeight: 600 }}>Nombre</th>
+                  <th style={{ fontWeight: 600 }}>Email</th>
+                  <th style={{ fontWeight: 600 }}>Rol</th>
+                  <th style={{ fontWeight: 600 }}>Estado</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -150,16 +169,16 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
 
         <div className="settings-divider" />
 
-        {/* Section 2: Commissions */}
+        {/* Section 2: Commissions + Exchange rate */}
         <section className="settings-section">
           <div className="settings-section-head">
             <div>
-              <div className="settings-section-title">2 · Comisiones</div>
-              <div className="settings-section-sub">Porcentajes por rol y automatización</div>
+              <div className="settings-section-title">2 · Comisiones y tipo de cambio</div>
+              <div className="settings-section-sub">Porcentajes por rol, automatización y FX</div>
             </div>
           </div>
           <div className="card card-pad" style={{ padding: '20px 22px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, marginBottom: 22 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 22, marginBottom: 22 }}>
               <div className="field">
                 <label className="label">Comisión Admin (%)</label>
                 <input className="input-full" type="number" step={0.1} value={commAdmin} onChange={e => setCommAdmin(parseFloat(e.target.value) || 0)} />
@@ -167,6 +186,18 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
               <div className="field">
                 <label className="label">Comisión Closer (%)</label>
                 <input className="input-full" type="number" step={0.1} value={commCloser} onChange={e => setCommCloser(parseFloat(e.target.value) || 0)} />
+              </div>
+              {/* #5 — tipo de cambio */}
+              <div className="field">
+                <label className="label">Tipo de cambio (ARS/USD)</label>
+                <input
+                  className="input-full"
+                  type="number"
+                  step={1}
+                  value={exchangeRate}
+                  onChange={e => setExchangeRate(Number(e.target.value) || 1200)}
+                  placeholder="1200"
+                />
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6 }}>
@@ -186,7 +217,7 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
           <div className="settings-section-head">
             <div>
               <div className="settings-section-title">3 · Pipeline</div>
-              <div className="settings-section-sub">Etapas del proceso comercial · arrastrá para reordenar</div>
+              <div className="settings-section-sub">Etapas del proceso comercial · arrastrá para reordenar · los nombres se guardan al salir del campo</div>
             </div>
           </div>
           <div className="card card-pad" style={{ padding: 14 }}>
@@ -207,8 +238,15 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
                   className="stage-input"
                   value={s.name}
                   onChange={e => setStages(prev => prev.map(p => p.id === s.id ? { ...p, name: e.target.value } : p))}
+                  onBlur={() => saveStage(s.id, s.name)}
                 />
-                <span className="badge badge-mute">
+                {/* #3 — green check feedback */}
+                {stageSaved[s.id] && (
+                  <span style={{ color: '#4CAF50', fontSize: 12, fontWeight: 600, marginLeft: 4, transition: 'opacity 0.3s' }}>
+                    ✓ Guardado
+                  </span>
+                )}
+                <span className="badge badge-mute" style={{ marginLeft: 'auto' }}>
                   {contacts.filter(c => c.stage_id === s.id).length} deals
                 </span>
               </div>
@@ -219,7 +257,7 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
 
       {/* Sticky save bar */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--surface-1)', borderTop: '1px solid var(--border)', padding: '14px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 12, color: saved ? 'var(--gold)' : 'var(--text-mute)' }}>
+        <div style={{ fontSize: 12, color: saved ? '#4CAF50' : 'var(--text-mute)' }}>
           {saved ? '✓ Cambios guardados' : 'Hay cambios sin guardar'}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>

@@ -25,37 +25,47 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
   const [contacts, setContacts] = useState<Contact[]>(initialContacts)
   const [query, setQuery] = useState('')
   const [originFilter, setOriginFilter] = useState('all')
+  const [stageFilter, setStageFilter] = useState('all')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [detailContact, setDetailContact] = useState<Contact | null>(null)
   const [stageMenuFor, setStageMenuFor] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', phone: '', origin: 'Meli', car_interest: '', vendor_id: '', amount: '' })
   const [saving, setSaving] = useState(false)
 
-  const filtered = useMemo(() =>
-    contacts.filter(c => {
+  // #2 — filtrado compuesto: origen + etapa + búsqueda simultáneos
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim()
+    return contacts.filter(c => {
       if (originFilter !== 'all' && c.origin !== originFilter) return false
-      if (query) {
-        const q = query.toLowerCase()
-        return c.name.toLowerCase().includes(q) ||
+      if (stageFilter !== 'all' && c.stage_id !== stageFilter) return false
+      if (q) {
+        return (
+          c.name.toLowerCase().includes(q) ||
           (c.phone ?? '').includes(q) ||
           (c.car_interest ?? '').toLowerCase().includes(q)
+        )
       }
       return true
-    }),
-    [contacts, query, originFilter]
-  )
+    })
+  }, [contacts, query, originFilter, stageFilter])
 
+  // #4 — WhatsApp dinámico con formato exacto
   function waLink(c: Contact) {
     const phone = (c.phone ?? '').replace(/[^\d]/g, '')
-    const txt = encodeURIComponent(`Hola ${c.name.split(' ')[0]}, te contactamos desde AURUM. ¿Seguís interesado/a en el ${c.car_interest}?`)
+    const firstName = c.name.split(' ')[0]
+    const car = c.car_interest ?? 'el vehículo de tu interés'
+    const txt = encodeURIComponent(`Hola ${firstName}, te contactamos desde AURUM respecto al ${car}.`)
     return `https://wa.me/${phone}?text=${txt}`
   }
 
   async function handleMoveStage(contactId: string, stageId: string) {
-    setContacts(prev => prev.map(c => c.id === contactId ? { ...c, stage_id: stageId, days: 0 } : c))
+    // Optimistic update
+    setContacts(prev => prev.map(c => c.id === contactId
+      ? { ...c, stage_id: stageId, stage: stages.find(s => s.id === stageId), days: 0 }
+      : c
+    ))
     setStageMenuFor(null)
     await supabase.from('leads').update({ stage_id: stageId, days: 0, updated_at: new Date().toISOString() }).eq('id', contactId)
-    // Log activity
     await supabase.from('activities').insert({ type: 'stage_change', description: `Movido a etapa: ${stages.find(s => s.id === stageId)?.name}`, lead_id: contactId })
     startTransition(() => router.refresh())
   }
@@ -81,7 +91,7 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
       .single()
 
     if (!error && data) {
-      setContacts(prev => [data, ...prev])
+      setContacts(prev => [data as Contact, ...prev])
       await supabase.from('activities').insert({ type: 'note', description: 'Lead creado', lead_id: data.id })
     }
     setForm({ name: '', phone: '', origin: 'Meli', car_interest: '', vendor_id: '', amount: '' })
@@ -101,7 +111,6 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
 
   return (
     <>
-      {/* Module Header */}
       <div className="module-header">
         <div>
           <div className="module-title">Leads Hub</div>
@@ -112,14 +121,19 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
             <Icon name="search" size={14} />
             <input
               className="search"
-              placeholder="Buscar por nombre, teléfono o auto…"
+              placeholder="Nombre, teléfono o auto…"
               value={query}
               onChange={e => setQuery(e.target.value)}
             />
           </div>
+          {/* #2 — filtros por origen y etapa */}
           <select className="select" value={originFilter} onChange={e => setOriginFilter(e.target.value)}>
             <option value="all">Todos los orígenes</option>
             {ORIGINS.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          <select className="select" value={stageFilter} onChange={e => setStageFilter(e.target.value)}>
+            <option value="all">Todas las etapas</option>
+            {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <button className="btn btn-primary" onClick={() => setDrawerOpen(true)}>
             <Icon name="plus" size={14} /> Nuevo lead
@@ -127,7 +141,6 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
         </div>
       </div>
 
-      {/* Body */}
       <div className="module-body">
         <div className="card">
           {filtered.length === 0 ? (
@@ -138,21 +151,23 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
             </div>
           ) : (
             <table className="table">
+              {/* #8 — th Inter 600 */}
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Teléfono</th>
-                  <th>Origen</th>
-                  <th>Auto de interés</th>
-                  <th>Etapa</th>
-                  <th>Fecha</th>
-                  <th style={{ textAlign: 'right' }}>Acciones</th>
+                  <th style={{ fontWeight: 600, padding: '13px 14px' }}>Nombre</th>
+                  <th style={{ fontWeight: 600, padding: '13px 14px' }}>Teléfono</th>
+                  <th style={{ fontWeight: 600, padding: '13px 14px' }}>Origen</th>
+                  <th style={{ fontWeight: 600, padding: '13px 14px' }}>Auto de interés</th>
+                  <th style={{ fontWeight: 600, padding: '13px 14px' }}>Etapa</th>
+                  <th style={{ fontWeight: 600, padding: '13px 14px' }}>Fecha</th>
+                  <th style={{ fontWeight: 600, padding: '13px 14px', textAlign: 'right' }}>Acciones</th>
                 </tr>
               </thead>
+              {/* #8 — td Inter 400, padding aumentado */}
               <tbody>
                 {filtered.map(c => (
                   <tr key={c.id}>
-                    <td>
+                    <td style={{ padding: '13px 14px', fontWeight: 400 }}>
                       <button
                         style={{ fontWeight: 500, background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', padding: 0, textAlign: 'left' }}
                         onClick={() => setDetailContact(c)}
@@ -160,28 +175,30 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
                         {c.name}
                       </button>
                     </td>
-                    <td className="muted tabular">{c.phone}</td>
-                    <td>
-                      <span>
+                    <td className="muted tabular" style={{ padding: '13px 14px', fontWeight: 400 }}>{c.phone}</td>
+                    <td style={{ padding: '13px 14px', fontWeight: 400 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <span className={`dot-orig ${originDotClass[c.origin ?? ''] ?? 'dot-web'}`} />
                         {c.origin}
                       </span>
                     </td>
-                    <td className="muted">{c.car_interest}</td>
-                    <td>
-                      {c.stage ? (
-                        <StageBadge stageId={c.stage_id} stageName={c.stage.name} />
-                      ) : <span className="badge badge-mute">{c.stage_id}</span>}
+                    <td className="muted" style={{ padding: '13px 14px', fontWeight: 400 }}>{c.car_interest}</td>
+                    <td style={{ padding: '13px 14px' }}>
+                      {c.stage
+                        ? <StageBadge stageId={c.stage_id} stageName={c.stage.name} />
+                        : <span className="badge badge-mute">{c.stage_id}</span>}
                     </td>
-                    <td className="muted tabular">{new Date(c.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}</td>
-                    <td>
+                    <td className="muted tabular" style={{ padding: '13px 14px', fontWeight: 400 }}>
+                      {new Date(c.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
+                    </td>
+                    <td style={{ padding: '13px 14px' }}>
                       <div className="actions-cell" style={{ justifyContent: 'flex-end' }}>
                         <a className="btn-wa" href={waLink(c)} target="_blank" rel="noopener noreferrer">
                           <Icon name="wa" size={12} /> WhatsApp
                         </a>
                         <div style={{ position: 'relative' }}>
                           <button className="btn btn-sm" onClick={() => setStageMenuFor(stageMenuFor === c.id ? null : c.id)}>
-                            Mover etapa <Icon name="chevron" size={10} />
+                            Mover <Icon name="chevron" size={10} />
                           </button>
                           {stageMenuFor === c.id && (
                             <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: 'var(--surface-2)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', zIndex: 10, minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', padding: 4 }}>
@@ -244,7 +261,7 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
           </div>
           <div className="field">
             <label className="label">Auto de interés</label>
-            <input className="input-full" value={form.car_interest} onChange={e => setForm({ ...form, car_interest: e.target.value })} placeholder="Ej. Porsche Cayenne S 2023" />
+            <input className="input-full" value={form.car_interest} onChange={e => setForm({ ...form, car_interest: e.target.value })} placeholder="Ej. Porsche Cayenne S 2024" />
           </div>
           <div className="field">
             <label className="label">Monto estimado (USD)</label>
@@ -279,9 +296,9 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
                 ['Origen', detailContact.origin],
                 ['Auto de interés', detailContact.car_interest],
                 ['Etapa', detailContact.stage?.name ?? detailContact.stage_id],
-                ['Monto estimado', detailContact.amount ? `US$${detailContact.amount.toLocaleString('en-US')}` : '—'],
+                ['Monto estimado', detailContact.amount ? `U$S ${detailContact.amount.toLocaleString('es-AR')}` : '—'],
                 ['Vendedor', detailContact.vendor?.name ?? '—'],
-                ['Días en etapa', detailContact.days + 'd'],
+                ['Días en etapa', String(detailContact.days ?? 0) + 'd'],
               ].map(([k, v]) => (
                 <div className="spec-row" key={k as string}>
                   <span className="k">{k}</span>
