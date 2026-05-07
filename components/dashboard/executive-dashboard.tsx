@@ -98,7 +98,7 @@ export default function ExecutiveDashboard({ contacts: initialContacts, inventor
 
   // #10 — Export PDF con jsPDF
   async function exportPDF() {
-    const { default: jsPDF } = await import('jspdf')
+    const { jsPDF } = await import('jspdf')
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const genDate = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
 

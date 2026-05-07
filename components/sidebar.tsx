@@ -41,7 +41,7 @@ export default function Sidebar({ profile }: SidebarProps) {
       </div>
       <div className="sidebar-section">Workspace</div>
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map(item => (
+        {NAV_ITEMS.filter(item => item.href !== '/settings' || profile?.role === 'Admin').map(item => (
           <Link
             key={item.href}
             href={item.href}

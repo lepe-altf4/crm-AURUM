@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Drawer from '@/components/ui/drawer'
@@ -22,7 +22,8 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
   const supabase = createClient()
   const [, startTransition] = useTransition()
 
-  const [contacts, setContacts] = useState<Contact[]>(initialContacts)
+  const [filtered, setFiltered] = useState<Contact[]>(initialContacts)
+  const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
   const [originFilter, setOriginFilter] = useState('all')
   const [stageFilter, setStageFilter] = useState('all')
@@ -32,22 +33,28 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
   const [form, setForm] = useState({ name: '', phone: '', origin: 'Meli', car_interest: '', vendor_id: '', amount: '' })
   const [saving, setSaving] = useState(false)
 
-  // #2 — filtrado compuesto: origen + etapa + búsqueda simultáneos
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim()
-    return contacts.filter(c => {
-      if (originFilter !== 'all' && c.origin !== originFilter) return false
-      if (stageFilter !== 'all' && c.stage_id !== stageFilter) return false
-      if (q) {
-        return (
-          c.name.toLowerCase().includes(q) ||
-          (c.phone ?? '').includes(q) ||
-          (c.car_interest ?? '').toLowerCase().includes(q)
-        )
+  // Query Supabase directly when filters change; debounce 300ms for text
+  useEffect(() => {
+    let cancelled = false
+    const delay = query.trim() ? 300 : 0
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      let q = supabase
+        .from('leads')
+        .select('*, stage:pipeline_stages(*), vendor:users(*)')
+        .order('created_at', { ascending: false })
+      if (originFilter !== 'all') q = q.eq('origin', originFilter)
+      if (stageFilter !== 'all') q = q.eq('stage_id', stageFilter)
+      if (query.trim()) {
+        const sq = query.trim()
+        q = q.or(`name.ilike.%${sq}%,phone.ilike.%${sq}%,car_interest.ilike.%${sq}%`)
       }
-      return true
-    })
-  }, [contacts, query, originFilter, stageFilter])
+      const { data } = await q
+      if (!cancelled && data) setFiltered(data as Contact[])
+      if (!cancelled) setLoading(false)
+    }, delay)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [query, originFilter, stageFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // #4 — WhatsApp dinámico con formato exacto
   function waLink(c: Contact) {
@@ -59,8 +66,7 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
   }
 
   async function handleMoveStage(contactId: string, stageId: string) {
-    // Optimistic update
-    setContacts(prev => prev.map(c => c.id === contactId
+    setFiltered(prev => prev.map(c => c.id === contactId
       ? { ...c, stage_id: stageId, stage: stages.find(s => s.id === stageId), days: 0 }
       : c
     ))
@@ -91,7 +97,7 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
       .single()
 
     if (!error && data) {
-      setContacts(prev => [data as Contact, ...prev])
+      setFiltered(prev => [data as Contact, ...prev])
       await supabase.from('activities').insert({ type: 'note', description: 'Lead creado', lead_id: data.id })
     }
     setForm({ name: '', phone: '', origin: 'Meli', car_interest: '', vendor_id: '', amount: '' })
@@ -102,7 +108,7 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este lead?')) return
-    setContacts(prev => prev.filter(c => c.id !== id))
+    setFiltered(prev => prev.filter(c => c.id !== id))
     await supabase.from('leads').delete().eq('id', id)
     startTransition(() => router.refresh())
   }
@@ -114,7 +120,7 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
       <div className="module-header">
         <div>
           <div className="module-title">Leads Hub</div>
-          <div className="module-sub">{filtered.length} prospectos · actualizado hoy</div>
+          <div className="module-sub">{loading ? 'Buscando…' : `${filtered.length} prospectos · actualizado hoy`}</div>
         </div>
         <div className="header-right">
           <div className="search-wrap">
