@@ -31,6 +31,9 @@ export default function VisualPipeline({ initialContacts, stages: initialStages,
   // #3 — stages as local state so realtime updates reflect immediately
   const [stages, setStages] = useState<Stage[]>(initialStages)
   const [activeDrag, setActiveDrag] = useState<Contact | null>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [vendorFilter, setVendorFilter] = useState('all')
+  const [stageFilterId, setStageFilterId] = useState('all')
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -101,17 +104,55 @@ export default function VisualPipeline({ initialContacts, stages: initialStages,
     startTransition(() => router.refresh())
   }
 
+  const hasFilter = vendorFilter !== 'all' || stageFilterId !== 'all'
+
+  const displayContacts = contacts.filter(c =>
+    vendorFilter === 'all' || c.vendor_id === vendorFilter
+  )
+  const displayStages = stageFilterId === 'all'
+    ? stages
+    : stages.filter(s => s.id === stageFilterId)
+
   return (
     <>
       <div className="module-header">
         <div>
           <div className="module-title">Visual Pipeline</div>
-          <div className="module-sub">{contacts.length} deals activos · arrastrá entre columnas para mover</div>
+          <div className="module-sub">
+            {displayContacts.length} deals{hasFilter ? ' filtrados' : ' activos'} · arrastrá entre columnas para mover
+          </div>
         </div>
         <div className="header-right">
-          <button className="btn"><Icon name="filter" size={12} /> Filtros</button>
+          <button
+            className={`btn${hasFilter ? ' btn-primary' : ''}`}
+            onClick={() => setFilterOpen(f => !f)}
+          >
+            <Icon name="filter" size={12} /> Filtros{hasFilter ? ` (${[vendorFilter !== 'all', stageFilterId !== 'all'].filter(Boolean).length})` : ''}
+          </button>
         </div>
       </div>
+
+      {filterOpen && (
+        <div style={{ padding: '10px 20px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-mute)', fontWeight: 500 }}>Filtrar por:</span>
+          <select className="select" value={vendorFilter} onChange={e => setVendorFilter(e.target.value)}>
+            <option value="all">Todos los vendedores</option>
+            {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>
+          <select className="select" value={stageFilterId} onChange={e => setStageFilterId(e.target.value)}>
+            <option value="all">Todas las etapas</option>
+            {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          {hasFilter && (
+            <button className="btn-ghost btn-sm" onClick={() => { setVendorFilter('all'); setStageFilterId('all') }}>
+              Limpiar
+            </button>
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-mute)' }}>
+            {displayContacts.length} deals
+          </span>
+        </div>
+      )}
 
       <div className="module-body" style={{ padding: '18px 20px', overflow: 'auto' }}>
         <DndContext
@@ -120,11 +161,11 @@ export default function VisualPipeline({ initialContacts, stages: initialStages,
           onDragEnd={handleDragEnd}
         >
           <div className="pipeline">
-            {stages.map(stage => (
+            {displayStages.map(stage => (
               <KanbanColumn
                 key={stage.id}
                 stage={stage}
-                contacts={contacts.filter(c => c.stage_id === stage.id)}
+                contacts={displayContacts.filter(c => c.stage_id === stage.id)}
                 vendors={vendors}
                 onAddContact={handleAddContact}
               />

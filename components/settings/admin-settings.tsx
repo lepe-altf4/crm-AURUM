@@ -33,11 +33,22 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Load persisted exchange rate
+  // Load exchange rate from Supabase settings table (falls back to localStorage)
   useEffect(() => {
-    const stored = localStorage.getItem('aurum_fx')
-    if (stored) setExchangeRate(Number(stored))
-  }, [])
+    ;(async () => {
+      try {
+        const { data } = await supabase.from('settings').select('value').eq('key', 'fx_rate').single()
+        if (data?.value) setExchangeRate(Number(data.value))
+        else {
+          const stored = localStorage.getItem('aurum_fx')
+          if (stored) setExchangeRate(Number(stored))
+        }
+      } catch {
+        const stored = localStorage.getItem('aurum_fx')
+        if (stored) setExchangeRate(Number(stored))
+      }
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function openEdit(p: Profile) {
     setEditingId(p.id)
@@ -90,8 +101,9 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
     await Promise.all(
       stages.map((s, i) => supabase.from('pipeline_stages').update({ position: i + 1, name: s.name }).eq('id', s.id))
     )
-    // Persist exchange rate to localStorage
+    // Persist exchange rate — both Supabase and localStorage fallback
     localStorage.setItem('aurum_fx', String(exchangeRate))
+    await supabase.from('settings').upsert({ key: 'fx_rate', value: String(exchangeRate), updated_at: new Date().toISOString() })
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 1800)
@@ -235,10 +247,22 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
                 <div className="drag-handle"><Icon name="drag" size={14} /></div>
                 <div className="num">{i + 1}</div>
                 <input
-                  className="stage-input"
                   value={s.name}
                   onChange={e => setStages(prev => prev.map(p => p.id === s.id ? { ...p, name: e.target.value } : p))}
                   onBlur={() => saveStage(s.id, s.name)}
+                  style={{
+                    flex: 1,
+                    background: 'var(--surface-3)',
+                    border: '1px solid var(--border-strong)',
+                    borderRadius: 5,
+                    color: 'var(--text)',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    padding: '6px 10px',
+                    outline: 'none',
+                    cursor: 'text',
+                    fontFamily: 'inherit',
+                  }}
                 />
                 {/* #3 — green check feedback */}
                 {stageSaved[s.id] && (

@@ -41,9 +41,20 @@ export default function StockManager({ initialInventory, contacts }: Props) {
   const [fx, setFx] = useState(1200)
 
   useEffect(() => {
-    const stored = localStorage.getItem('aurum_fx')
-    if (stored) setFx(Number(stored))
-  }, [])
+    ;(async () => {
+      try {
+        const { data } = await supabase.from('settings').select('value').eq('key', 'fx_rate').single()
+        if (data?.value) setFx(Number(data.value))
+        else {
+          const stored = localStorage.getItem('aurum_fx')
+          if (stored) setFx(Number(stored))
+        }
+      } catch {
+        const stored = localStorage.getItem('aurum_fx')
+        if (stored) setFx(Number(stored))
+      }
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const brands = useMemo(() => Array.from(new Set(items.map(u => u.brand))).sort(), [items])
 

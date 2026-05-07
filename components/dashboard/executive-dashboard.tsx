@@ -96,147 +96,171 @@ export default function ExecutiveDashboard({ contacts: initialContacts, inventor
 
   const maxRevenue = Math.max(...weeklySales.map(w => w.revenue), 1)
 
-  // #10 — Export PDF con jsPDF
   async function exportPDF() {
-    const { jsPDF } = await import('jspdf')
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const genDate = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+    const filename = `AURUM-Reporte-${period.replace(' ', '-')}.pdf`
+    try {
+      // jsPDF v4 uses named export; fallback to default for older bundler configs
+      const mod = await import('jspdf')
+      const JsPDF: any = (mod as any).jsPDF ?? (mod as any).default
+      if (!JsPDF) throw new Error('jsPDF no disponible')
 
-    const setGold  = () => doc.setTextColor(250, 197, 28)
-    const setWhite = () => doc.setTextColor(255, 255, 255)
-    const setDark  = () => doc.setTextColor(34, 34, 34)
-    const setGray  = () => doc.setTextColor(120, 120, 120)
+      const doc = new JsPDF('p', 'mm', 'a4')
 
-    // ── Header negro
-    doc.setFillColor(0, 0, 0)
-    doc.rect(0, 0, 210, 36, 'F')
+      // Strip accents — built-in helvetica font only handles Latin-1 subset
+      const a = (str: string) => str
+        .replace(/[áàâã]/g, 'a').replace(/[ÁÀÂÃ]/g, 'A')
+        .replace(/[éèê]/g, 'e').replace(/[ÉÈÊ]/g, 'E')
+        .replace(/[íìî]/g, 'i').replace(/[ÍÌÎ]/g, 'I')
+        .replace(/[óòôõ]/g, 'o').replace(/[ÓÒÔÕ]/g, 'O')
+        .replace(/[úùûü]/g, 'u').replace(/[ÚÙÛÜ]/g, 'U')
+        .replace(/ñ/g, 'n').replace(/Ñ/g, 'N')
 
-    setGold()
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(24)
-    doc.text('AURUM', 14, 17)
+      const setGold  = () => doc.setTextColor(250, 197, 28)
+      const setWhite = () => doc.setTextColor(255, 255, 255)
+      const setDark  = () => doc.setTextColor(34, 34, 34)
+      const setGray  = () => doc.setTextColor(120, 120, 120)
 
-    setWhite()
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.text('Reporte Ejecutivo', 14, 27)
-    doc.setFontSize(9)
-    doc.text(period, 196, 17, { align: 'right' })
-    setGray()
-    doc.text('Generado: ' + genDate, 196, 27, { align: 'right' })
+      const genDate = a(new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }))
 
-    // ── Sección 1: KPIs
-    let y = 48
-    setGold()
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.text('MÉTRICAS PRINCIPALES', 14, y)
-
-    y += 6
-    const kpis = [
-      { label: 'Revenue del mes',    value: fmtUSD(totalRevenue) },
-      { label: 'Unidades vendidas',  value: `${unitsSold} / ${unitsTarget}` },
-      { label: 'Tasa de conversión', value: `${convRate}%` },
-      { label: 'Ticket promedio',    value: fmtUSD(avgTicket) },
-    ]
-
-    kpis.forEach((kpi, i) => {
-      const col = i % 2 === 0 ? 14 : 113
-      const ky = y + Math.floor(i / 2) * 26
-      doc.setFillColor(245, 245, 245)
-      doc.roundedRect(col, ky, 89, 22, 2, 2, 'F')
-      setGray()
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(7.5)
-      doc.text(kpi.label.toUpperCase(), col + 6, ky + 8)
-      setDark()
+      // Header
+      doc.setFillColor(0, 0, 0)
+      doc.rect(0, 0, 210, 36, 'F')
+      setGold()
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(13)
-      doc.text(kpi.value, col + 6, ky + 18)
-    })
-
-    // ── Sección 2: Ranking de vendedores
-    y += 58
-    doc.setDrawColor(220, 220, 220)
-    doc.setLineWidth(0.3)
-    doc.line(14, y - 4, 196, y - 4)
-    setGold()
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.text('RANKING DE VENDEDORES', 14, y)
-
-    y += 7
-    vendorStats.forEach((v, i) => {
-      const rowY = y + i * 12
-      if (i === 0) {
-        doc.setFillColor(34, 34, 34)
-        doc.roundedRect(14, rowY - 4, 182, 11, 1.5, 1.5, 'F')
-      }
-      doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
+      doc.setFontSize(24)
+      doc.text('AURUM', 14, 17)
+      setWhite()
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.text('Reporte Ejecutivo', 14, 27)
       doc.setFontSize(9)
-      if (i === 0) setGold(); else setDark()
-      doc.text(`${String(i + 1).padStart(2, '0')}  ${v.name}`, 18, rowY + 3.5)
+      doc.text(a(period), 196, 17, { align: 'right' })
+      setGray()
+      doc.text('Generado: ' + genDate, 196, 27, { align: 'right' })
+
+      // KPIs
+      let y = 48
+      setGold()
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.text('METRICAS PRINCIPALES', 14, y)
+      y += 6
+
+      const kpis = [
+        { label: 'Revenue del mes',   value: fmtUSD(totalRevenue) },
+        { label: 'Unidades vendidas', value: `${unitsSold} / ${unitsTarget}` },
+        { label: 'Tasa de conversion',value: `${convRate}%` },
+        { label: 'Ticket promedio',   value: fmtUSD(avgTicket) },
+      ]
+      kpis.forEach((kpi, i) => {
+        const col = i % 2 === 0 ? 14 : 113
+        const ky = y + Math.floor(i / 2) * 26
+        doc.setFillColor(245, 245, 245)
+        doc.rect(col, ky, 89, 22, 'F')
+        setGray()
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7.5)
+        doc.text(kpi.label.toUpperCase(), col + 6, ky + 8)
+        setDark()
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(13)
+        doc.text(kpi.value, col + 6, ky + 18)
+      })
+
+      // Vendor ranking
+      y += 58
+      doc.setDrawColor(220, 220, 220)
+      doc.setLineWidth(0.3)
+      doc.line(14, y - 4, 196, y - 4)
+      setGold()
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.text('RANKING DE VENDEDORES', 14, y)
+      y += 7
+
+      vendorStats.forEach((v, i) => {
+        const rowY = y + i * 12
+        if (i === 0) {
+          doc.setFillColor(34, 34, 34)
+          doc.rect(14, rowY - 4, 182, 11, 'F')
+        }
+        doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
+        doc.setFontSize(9)
+        if (i === 0) { setGold() } else { setDark() }
+        doc.text(`${i + 1}.  ${a(v.name)}`, 18, rowY + 3.5)
+        setGray()
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7.5)
+        doc.text(`${v.deals} deals - ${v.rate}% cierre`, 95, rowY + 3.5)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        setDark()
+        doc.text(fmtUSD(v.revenue), 192, rowY + 3.5, { align: 'right' })
+      })
+
+      // Recent closed ops
+      y += vendorStats.length * 12 + 12
+      doc.setDrawColor(220, 220, 220)
+      doc.line(14, y - 4, 196, y - 4)
+      setGold()
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.text('ULTIMAS OPERACIONES CERRADAS', 14, y)
+      y += 6
+
+      doc.setFillColor(34, 34, 34)
+      doc.rect(14, y, 182, 7, 'F')
+      setWhite()
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7)
+      doc.text('VEHICULO', 18, y + 4.8)
+      doc.text('CLIENTE', 78, y + 4.8)
+      doc.text('VENDEDOR', 120, y + 4.8)
+      doc.text('FECHA', 155, y + 4.8)
+      doc.text('MONTO', 192, y + 4.8, { align: 'right' })
+      y += 7
+
+      recentClosed.forEach((c, i) => {
+        const rowY = y + i * 9
+        if (i % 2 === 0) {
+          doc.setFillColor(250, 250, 250)
+          doc.rect(14, rowY, 182, 9, 'F')
+        }
+        setDark()
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7.5)
+        doc.text(a(c.car_interest ?? '-').slice(0, 28), 18, rowY + 6)
+        setGray()
+        doc.text(a(c.name).slice(0, 24), 78, rowY + 6)
+        doc.text(a(c.vendor?.name ?? '-').slice(0, 18), 120, rowY + 6)
+        doc.text(new Date(c.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }), 155, rowY + 6)
+        doc.setFont('helvetica', 'bold')
+        setDark()
+        doc.text(fmtUSD(c.amount), 192, rowY + 6, { align: 'right' })
+      })
+
+      // Footer
+      doc.setFillColor(0, 0, 0)
+      doc.rect(0, 286, 210, 11, 'F')
       setGray()
       doc.setFont('helvetica', 'normal')
-      doc.setFontSize(7.5)
-      doc.text(`${v.deals} deals · ${v.rate}% cierre`, 95, rowY + 3.5)
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
-      setDark()
-      doc.text(fmtUSD(v.revenue), 192, rowY + 3.5, { align: 'right' })
-    })
+      doc.setFontSize(7)
+      doc.text('AURUM CRM - Reporte generado el ' + genDate, 14, 293)
+      doc.text('Confidencial', 196, 293, { align: 'right' })
 
-    // ── Sección 3: Últimas operaciones cerradas
-    y += vendorStats.length * 12 + 12
-    doc.setDrawColor(220, 220, 220)
-    doc.line(14, y - 4, 196, y - 4)
-    setGold()
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.text('ÚLTIMAS OPERACIONES CERRADAS', 14, y)
-
-    y += 6
-    doc.setFillColor(34, 34, 34)
-    doc.rect(14, y, 182, 7, 'F')
-    setWhite()
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.text('VEHÍCULO', 18, y + 4.8)
-    doc.text('CLIENTE', 78, y + 4.8)
-    doc.text('VENDEDOR', 120, y + 4.8)
-    doc.text('FECHA', 155, y + 4.8)
-    doc.text('MONTO', 192, y + 4.8, { align: 'right' })
-
-    y += 7
-    recentClosed.forEach((c, i) => {
-      const rowY = y + i * 9
-      if (i % 2 === 0) {
-        doc.setFillColor(250, 250, 250)
-        doc.rect(14, rowY, 182, 9, 'F')
-      }
-      setDark()
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(7.5)
-      doc.text((c.car_interest ?? '—').slice(0, 28), 18, rowY + 6)
-      setGray()
-      doc.text(c.name.slice(0, 24), 78, rowY + 6)
-      doc.text((c.vendor?.name ?? '—').slice(0, 18), 120, rowY + 6)
-      doc.text(new Date(c.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }), 155, rowY + 6)
-      doc.setFont('helvetica', 'bold')
-      setDark()
-      doc.text(fmtUSD(c.amount), 192, rowY + 6, { align: 'right' })
-    })
-
-    // ── Footer
-    doc.setFillColor(0, 0, 0)
-    doc.rect(0, 286, 210, 11, 'F')
-    setGray()
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.text('AURUM CRM · Reporte generado el ' + genDate, 14, 293)
-    doc.text('Confidencial', 196, 293, { align: 'right' })
-
-    doc.save(`AURUM-Reporte-${period.replace(' ', '-')}.pdf`)
+      // Blob download — works in all browsers including Safari
+      const blob = doc.output('blob')
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000)
+    } catch (err) {
+      console.error('PDF export error:', err)
+      alert('Error al exportar PDF: ' + (err instanceof Error ? err.message : String(err)))
+    }
   }
 
   const periodOptions = Array.from({ length: 6 }, (_, i) => {
