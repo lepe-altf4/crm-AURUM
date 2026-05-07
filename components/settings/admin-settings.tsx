@@ -4,7 +4,12 @@ import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Icon from '@/components/ui/icon'
+import Drawer from '@/components/ui/drawer'
+import { inviteUser, deleteUserAction } from '@/app/(app)/settings/actions'
 import type { Profile, Stage } from '@/lib/types'
+
+const SUPER_ADMIN_EMAIL = 'lepemate1310@gmail.com'
+const isSuperAdmin = (email?: string | null) => (email ?? '').toLowerCase() === SUPER_ADMIN_EMAIL
 
 interface Props {
   initialProfiles: Profile[]
@@ -16,6 +21,14 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
   const router = useRouter()
   const supabase = createClient()
   const [, startTransition] = useTransition()
+
+  // Invite modal state
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteForm, setInviteForm] = useState<{ name: string; email: string; role: 'Admin' | 'Closer' }>({ name: '', email: '', role: 'Closer' })
+  const [inviting, setInviting] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  // Delete state
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles)
   const [stages, setStages] = useState<Stage[]>(initialStages)
@@ -53,6 +66,42 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
   function openEdit(p: Profile) {
     setEditingId(p.id)
     setEditForm({ name: p.name, email: p.email, role: p.role })
+  }
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    if (inviting) return
+    setInviting(true)
+    setInviteMsg(null)
+    const res = await inviteUser(inviteForm.name, inviteForm.email, inviteForm.role)
+    if (res.ok) {
+      setInviteMsg({ kind: 'ok', text: '✓ Invitación enviada por email' })
+      setInviteForm({ name: '', email: '', role: 'Closer' })
+      startTransition(() => router.refresh())
+      setTimeout(() => { setInviteOpen(false); setInviteMsg(null) }, 1400)
+    } else {
+      setInviteMsg({ kind: 'err', text: res.error })
+    }
+    setInviting(false)
+  }
+
+  async function handleDeleteUser(p: Profile) {
+    if (isSuperAdmin(p.email)) {
+      alert('El SuperAdmin no puede eliminarse')
+      return
+    }
+    if (!confirm(`¿Eliminar a ${p.name} (${p.email})? Esta acción no se puede deshacer.`)) return
+    setDeletingId(p.id)
+    const res = await deleteUserAction(p.id)
+    if (res.ok) {
+      setProfiles(prev => prev.filter(x => x.id !== p.id))
+      setEditingId(null)
+      setEditForm(null)
+      startTransition(() => router.refresh())
+    } else {
+      alert('Error: ' + res.error)
+    }
+    setDeletingId(null)
   }
 
   async function saveEdit() {
@@ -127,7 +176,7 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
               <div className="settings-section-title">1 · Equipo</div>
               <div className="settings-section-sub">Usuarios del workspace y sus permisos</div>
             </div>
-            <button className="btn btn-sm"><Icon name="plus" size={12} /> Invitar usuario</button>
+            <button className="btn btn-sm" onClick={() => { setInviteOpen(true); setInviteMsg(null) }}><Icon name="plus" size={12} /> Invitar usuario</button>
           </div>
           <div className="card">
             <table className="table">
@@ -155,6 +204,17 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
                       <td><span className={`badge ${p.active ? 'badge-gold' : 'badge-mute'}`}><span className="dot" />{p.active ? 'Activo' : 'Inactivo'}</span></td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="actions-cell" style={{ justifyContent: 'flex-end' }}>
+                          {!isSuperAdmin(p.email) && (
+                            <button
+                              className="btn-ghost btn-sm"
+                              style={{ color: 'var(--danger)' }}
+                              onClick={() => handleDeleteUser(p)}
+                              disabled={deletingId === p.id}
+                              title="Eliminar usuario"
+                            >
+                              <Icon name="close" size={11} /> {deletingId === p.id ? 'Eliminando…' : 'Eliminar'}
+                            </button>
+                          )}
                           <button className="btn-ghost btn-sm" onClick={() => { setEditingId(null); setEditForm(null) }}>Cancelar</button>
                           <button className="btn btn-primary btn-sm" onClick={saveEdit}>Guardar</button>
                         </div>
@@ -278,6 +338,73 @@ export default function AdminSettings({ initialProfiles, initialStages, contacts
           </div>
         </section>
       </div>
+
+      {/* Invite user modal */}
+      <Drawer
+        open={inviteOpen}
+        onClose={() => { if (!inviting) { setInviteOpen(false); setInviteMsg(null) } }}
+        title="Invitar usuario"
+        footer={
+          <>
+            <button className="btn" onClick={() => setInviteOpen(false)} disabled={inviting}>Cancelar</button>
+            <button className="btn btn-primary" onClick={handleInvite} disabled={inviting || !inviteForm.name || !inviteForm.email}>
+              {inviting ? 'Enviando…' : 'Enviar invitación'}
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleInvite}>
+          <div style={{ fontSize: 12, color: 'var(--text-mute)', marginBottom: 16, lineHeight: 1.5 }}>
+            Se enviará un email a la persona invitada con un enlace para crear su contraseña y acceder al CRM.
+          </div>
+          <div className="field">
+            <label className="label">Nombre completo</label>
+            <input
+              className="input-full"
+              value={inviteForm.name}
+              onChange={e => setInviteForm({ ...inviteForm, name: e.target.value })}
+              placeholder="Ej. Federico Anaya"
+              required
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label className="label">Email</label>
+            <input
+              className="input-full"
+              type="email"
+              value={inviteForm.email}
+              onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })}
+              placeholder="ejemplo@aurum.com"
+              required
+            />
+          </div>
+          <div className="field">
+            <label className="label">Rol</label>
+            <select
+              className="select-full"
+              value={inviteForm.role}
+              onChange={e => setInviteForm({ ...inviteForm, role: e.target.value as 'Admin' | 'Closer' })}
+            >
+              <option value="Closer">Closer</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          {inviteMsg && (
+            <div style={{
+              marginTop: 12,
+              padding: '10px 12px',
+              borderRadius: 6,
+              fontSize: 12.5,
+              background: inviteMsg.kind === 'ok' ? 'rgba(76,175,80,0.12)' : 'rgba(220,53,69,0.12)',
+              color: inviteMsg.kind === 'ok' ? '#4CAF50' : 'var(--danger)',
+              border: `1px solid ${inviteMsg.kind === 'ok' ? 'rgba(76,175,80,0.3)' : 'rgba(220,53,69,0.3)'}`,
+            }}>
+              {inviteMsg.text}
+            </div>
+          )}
+        </form>
+      </Drawer>
 
       {/* Sticky save bar */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--surface-1)', borderTop: '1px solid var(--border)', padding: '14px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
