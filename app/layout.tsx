@@ -9,7 +9,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'AURUM · CRM para agencias de autos de alta gama',
+  title: 'AURUM CARS · CRM para agencias de autos de alta gama',
   description: 'CRM de alta gama para concesionarias premium',
 }
 

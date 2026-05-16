@@ -32,7 +32,7 @@ export default function LoginPage() {
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32, justifyContent: 'center' }}>
         <div className="mark" style={{ width: 32, height: 32, fontSize: 15 }}>A</div>
-        <div style={{ fontWeight: 700, letterSpacing: '0.18em', fontSize: 16, color: 'var(--text)' }}>AURUM</div>
+        <div style={{ fontWeight: 700, letterSpacing: '0.10em', fontSize: 14, color: 'var(--text)' }}>AURUM CARS</div>
       </div>
 
       <div className="card" style={{ padding: '32px' }}>
@@ -41,7 +41,7 @@ export default function LoginPage() {
             Iniciar sesión
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-mute)' }}>
-            Accede a tu workspace de AURUM
+            Accede a tu workspace de AURUM CARS
           </div>
         </div>
 

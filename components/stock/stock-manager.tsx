@@ -211,11 +211,9 @@ export default function StockManager({ initialInventory, contacts }: Props) {
             </>
           }
         >
-          <div style={{ height: 180, borderRadius: 8, marginBottom: 18, background: 'linear-gradient(135deg,#181818,#0d0d0d)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden', backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 6px, transparent 6px 14px)', display: 'grid', placeItems: 'center', color: 'var(--text-mute)', fontSize: 11 }}>
-            <div style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.1em' }}>[ FOTO DEL VEHÍCULO ]</div>
-            <div style={{ position: 'absolute', top: 12, right: 12 }}>
-              <span className={STATUS_BADGE_CLASS[drawerItem.status]}><span className="dot" />{STATUS_LABEL[drawerItem.status]}</span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <span className={STATUS_BADGE_CLASS[drawerItem.status]}><span className="dot" />{STATUS_LABEL[drawerItem.status]}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-mute)' }}>{drawerItem.brand} · {drawerItem.year}</span>
           </div>
 
           <div className="card" style={{ marginBottom: 18, padding: '4px 16px' }}>

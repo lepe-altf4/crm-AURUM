@@ -9,6 +9,7 @@ import type { Profile } from '@/lib/types'
 const NAV_ITEMS = [
   { href: '/leads', label: 'Leads Hub', icon: 'leads' },
   { href: '/pipeline', label: 'Visual Pipeline', icon: 'pipeline' },
+  { href: '/sales', label: 'Panel de Ventas', icon: 'sales' },
   { href: '/stock', label: 'Stock Manager', icon: 'stock' },
   { href: '/dashboard', label: 'Executive Dashboard', icon: 'dash' },
   { href: '/settings', label: 'Admin Settings', icon: 'settings' },
@@ -37,7 +38,7 @@ export default function Sidebar({ profile }: SidebarProps) {
     <aside className="sidebar">
       <div className="sidebar-logo">
         <div className="mark">A</div>
-        <div className="word">AURUM</div>
+        <div className="word" style={{ letterSpacing: '0.10em', fontSize: 12 }}>AURUM CARS</div>
       </div>
       <div className="sidebar-section">Workspace</div>
       <nav className="sidebar-nav">

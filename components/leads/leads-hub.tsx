@@ -61,7 +61,7 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
     const phone = (c.phone ?? '').replace(/[^\d]/g, '')
     const firstName = c.name.split(' ')[0]
     const car = c.car_interest ?? 'el vehículo de tu interés'
-    const txt = encodeURIComponent(`Hola ${firstName}, te contactamos desde AURUM respecto al ${car}.`)
+    const txt = encodeURIComponent(`Hola ${firstName}, te contactamos desde AURUM CARS respecto al ${car}.`)
     return `https://wa.me/${phone}?text=${txt}`
   }
 

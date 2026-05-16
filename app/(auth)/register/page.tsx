@@ -58,7 +58,7 @@ export default function RegisterPage() {
     <div style={{ width: 400 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32, justifyContent: 'center' }}>
         <div className="mark" style={{ width: 32, height: 32, fontSize: 15 }}>A</div>
-        <div style={{ fontWeight: 700, letterSpacing: '0.18em', fontSize: 16, color: 'var(--text)' }}>AURUM</div>
+        <div style={{ fontWeight: 700, letterSpacing: '0.10em', fontSize: 14, color: 'var(--text)' }}>AURUM CARS</div>
       </div>
 
       <div className="card" style={{ padding: '32px' }}>
@@ -66,7 +66,7 @@ export default function RegisterPage() {
           <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em', marginBottom: 6 }}>
             Crear cuenta
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-mute)' }}>Registrate en AURUM CRM</div>
+          <div style={{ fontSize: 13, color: 'var(--text-mute)' }}>Registrate en AURUM CARS CRM</div>
         </div>
 
         {error && (
