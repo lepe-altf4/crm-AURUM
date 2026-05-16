@@ -22,18 +22,26 @@ interface Props {
 function pad2(n: number) { return String(n).padStart(2, '0') }
 function todayStr() { return new Date().toISOString().split('T')[0] }
 
-export default function SalesPanel({ initialLeads, stages, vendors }: Props) {
+export default function SalesPanel({ initialLeads, stages: initialStages, vendors }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [, startTransition] = useTransition()
 
   const [leads, setLeads] = useState<Contact[]>(initialLeads)
+  // Mirroring VisualPipeline: stages in local state + client-side fetch on mount
+  const [stages, setStages] = useState<Stage[]>(initialStages)
   const [activeTab, setActiveTab] = useState<Tab>('pipeline')
   const [selectedLead, setSelectedLead] = useState<Contact | null>(null)
   const [editingDate, setEditingDate] = useState<string | null>(null)
   const [savingDate, setSavingDate] = useState(false)
 
-  // Realtime updates
+  // Fetch stages client-side on mount — same as VisualPipeline does via realtime
+  useEffect(() => {
+    supabase.from('pipeline_stages').select('*').order('position')
+      .then(({ data }) => { if (data && data.length > 0) setStages(data as Stage[]) })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime: leads changes
   useEffect(() => {
     const ch = supabase
       .channel('rt-sales-leads')
@@ -48,9 +56,26 @@ export default function SalesPanel({ initialLeads, stages, vendors }: Props) {
     return () => { supabase.removeChannel(ch) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Realtime: stage name changes (same as VisualPipeline)
+  useEffect(() => {
+    const stagesCh = supabase
+      .channel('rt-sales-stages')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pipeline_stages' }, payload => {
+        setStages(prev => prev.map(s => s.id === (payload.new as Stage).id ? { ...s, ...payload.new as Stage } : s))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(stagesCh) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const today = todayStr()
-  const activeLeads = leads.filter(l => l.stage_id !== 's5')
-  const closedLeads = leads.filter(l => l.stage_id === 's5')
+
+  // Closed stage = last by position; fallback 's5' if stages not loaded yet
+  const closedStageId = stages.length > 0
+    ? stages.reduce((a, b) => ((b as any).position ?? 0) > ((a as any).position ?? 0) ? b : a).id
+    : 's5'
+
+  const activeLeads = leads.filter(l => l.stage_id !== closedStageId)
+  const closedLeads = leads.filter(l => l.stage_id === closedStageId)
   const leadsToday = activeLeads.filter(l => l.next_action_date === today)
   const overdueLeads = activeLeads.filter(l => l.next_action_date && l.next_action_date < today)
   const noActionLeads = activeLeads.filter(l => !l.next_action_date)
@@ -380,10 +405,30 @@ function CalendarView({ leads, onSelect }: { leads: Contact[]; onSelect: (l: Con
 
 /* ── METRICS VIEW ── */
 function MetricsView({ leads, stages, today }: { leads: Contact[]; stages: Stage[]; today: string }) {
-  const activeLeads = leads.filter(l => l.stage_id !== 's5')
-  const closedLeads = leads.filter(l => l.stage_id === 's5')
+  // Determine closed stage dynamically (last by position) — no hardcoded 's5'
+  const closedStageId = stages.length > 0
+    ? stages.reduce((a, b) => ((b as any).position ?? 0) > ((a as any).position ?? 0) ? b : a).id
+    : 's5'
+
+  const activeLeads = leads.filter(l => l.stage_id !== closedStageId)
+  const closedLeads = leads.filter(l => l.stage_id === closedStageId)
   const overdueLeads = activeLeads.filter(l => l.next_action_date && l.next_action_date < today)
   const noActionLeads = activeLeads.filter(l => !l.next_action_date)
+
+  // Stage breakdown: all non-closed stages with their lead counts
+  const stageBreakdown = stages
+    .filter(s => s.id !== closedStageId)
+    .map(s => ({ ...s, count: activeLeads.filter(l => l.stage_id === s.id).length }))
+    .sort((a, b) => b.count - a.count)
+
+  const topStage = stageBreakdown[0]
+  const topCount = topStage?.count ?? 0
+  const topName = topStage?.name ?? '—'
+  const breakdownDetail = stageBreakdown
+    .filter(s => s.count > 0)
+    .slice(0, 3)
+    .map(s => `${s.name}: ${s.count}`)
+    .join(' · ') || 'Sin leads activos'
 
   const metrics = [
     {
@@ -396,9 +441,9 @@ function MetricsView({ leads, stages, today }: { leads: Contact[]; stages: Stage
     },
     {
       label: 'Por Etapa',
-      value: stages.filter(s => s.id !== 's5').length,
-      desc: '¿En qué fase se atascan?',
-      detail: 'Leads activos agrupados por Etapa pipeline',
+      value: topCount,
+      desc: `${topCount > 0 ? `${topCount} en ${topName}` : '¿En qué fase se atascan?'}`,
+      detail: breakdownDetail,
       color: '#60a5fa',
       icon: 'pipeline',
     },
@@ -428,11 +473,6 @@ function MetricsView({ leads, stages, today }: { leads: Contact[]; stages: Stage
     },
   ]
 
-  const stageBreakdown = stages
-    .filter(s => s.id !== 's5')
-    .map(s => ({ ...s, count: activeLeads.filter(l => l.stage_id === s.id).length }))
-    .sort((a, b) => b.count - a.count)
-
   return (
     <div style={{ maxWidth: 860 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
@@ -451,13 +491,17 @@ function MetricsView({ leads, stages, today }: { leads: Contact[]; stages: Stage
         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-mute)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>
           Distribución por Etapa
         </div>
-        {stageBreakdown.map(s => {
+        {stageBreakdown.length === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--text-mute)', padding: '12px 0' }}>Sin leads activos en ninguna etapa.</div>
+        ) : stageBreakdown.map(s => {
           const pct = activeLeads.length > 0 ? (s.count / activeLeads.length) * 100 : 0
           return (
             <div key={s.id} style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{s.name}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{s.count} <span style={{ color: 'var(--text-mute)', fontWeight: 400 }}>({pct.toFixed(0)}%)</span></span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                  {s.count} <span style={{ color: 'var(--text-mute)', fontWeight: 400 }}>({pct.toFixed(0)}%)</span>
+                </span>
               </div>
               <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${pct}%`, background: 'var(--gold)', borderRadius: 2, transition: 'width 0.4s' }} />
