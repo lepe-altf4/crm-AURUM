@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Icon from '@/components/ui/icon'
 
-interface ContactSnap { id: string; amount: number; stage_id: string; vendor_id: string | null }
+interface ContactSnap { id: string; amount: number; stage_id: string; vendor_id: string | null; next_action_date?: string | null }
 interface InventorySnap { id: string; price: number; status: string }
 interface WeeklySale { id: string; week: string; units: number; revenue: number; target: number }
 interface ProfileSnap { id: string; name: string; initials: string }
 interface ClosedContact { id: string; name: string; car_interest: string | null; amount: number; created_at: string; vendor_id: string | null; vendor?: { name: string } | null }
+interface StageSnap { id: string; name: string; order: number }
 
 interface Props {
   contacts: ContactSnap[]
@@ -16,6 +17,7 @@ interface Props {
   weeklySales: WeeklySale[]
   profiles: ProfileSnap[]
   recentClosed: ClosedContact[]
+  stages?: StageSnap[]
 }
 
 // #6 — formato estricto U$S 000.000
@@ -34,7 +36,7 @@ function fmtShort(n: number, currency: 'USD' | 'ARS', fx: number) {
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-export default function ExecutiveDashboard({ contacts: initialContacts, inventory: initialInventory, weeklySales, profiles, recentClosed }: Props) {
+export default function ExecutiveDashboard({ contacts: initialContacts, inventory: initialInventory, weeklySales, profiles, recentClosed, stages = [] }: Props) {
   const supabase = createClient()
   const [contacts, setContacts] = useState<ContactSnap[]>(initialContacts)
   const [inventory, setInventory] = useState<InventorySnap[]>(initialInventory)
@@ -86,6 +88,16 @@ export default function ExecutiveDashboard({ contacts: initialContacts, inventor
   const convRate = totalLeads > 0 ? ((closedContacts.length / totalLeads) * 100).toFixed(1) : '0.0'
   const avgTicket = closedContacts.length > 0 ? totalRevenue / closedContacts.length : 0
 
+  // 5 métricas mínimas
+  const todayStr = new Date().toISOString().split('T')[0]
+  const activeLeads = contacts.filter(c => c.stage_id !== 's5')
+  const overdueLeads = activeLeads.filter(c => c.next_action_date && c.next_action_date < todayStr)
+  const noActionLeads = activeLeads.filter(c => !c.next_action_date)
+  const stageBreakdown = (stages.length > 0 ? stages : []).map(s => ({
+    id: s.id, name: s.name,
+    count: activeLeads.filter(c => c.stage_id === s.id).length,
+  })).filter(s => s.count > 0).sort((a, b) => b.count - a.count)
+
   const vendorStats = profiles.map(p => {
     const vendorDeals = closedContacts.filter(c => c.vendor_id === p.id)
     const vendorRevenue = vendorDeals.reduce((acc, c) => acc + (c.amount ?? 0), 0)
@@ -97,7 +109,7 @@ export default function ExecutiveDashboard({ contacts: initialContacts, inventor
   const maxRevenue = Math.max(...weeklySales.map(w => w.revenue), 1)
 
   async function exportPDF() {
-    const filename = `AURUM-Reporte-${period.replace(' ', '-')}.pdf`
+    const filename = `AURUM-CARS-Reporte-${period.replace(' ', '-')}.pdf`
     try {
       // jsPDF v4 uses named export; fallback to default for older bundler configs
       const mod = await import('jspdf')
@@ -128,7 +140,7 @@ export default function ExecutiveDashboard({ contacts: initialContacts, inventor
       setGold()
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(24)
-      doc.text('AURUM', 14, 17)
+      doc.text('AURUM CARS', 14, 17)
       setWhite()
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(10)
@@ -245,7 +257,7 @@ export default function ExecutiveDashboard({ contacts: initialContacts, inventor
       setGray()
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(7)
-      doc.text('AURUM CRM - Reporte generado el ' + genDate, 14, 293)
+      doc.text('AURUM CARS CRM - Reporte generado el ' + genDate, 14, 293)
       doc.text('Confidencial', 196, 293, { align: 'right' })
 
       // Blob download — works in all browsers including Safari
@@ -301,6 +313,47 @@ export default function ExecutiveDashboard({ contacts: initialContacts, inventor
       </div>
 
       <div className="module-body">
+        {/* 5 Métricas Mínimas */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-mute)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>
+            5 Métricas Mínimas
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+            {/* Leads Activos */}
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px' }}>
+              <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>{activeLeads.length}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginTop: 6 }}>Leads Activos</div>
+              <div style={{ fontSize: 10, color: 'var(--text-mute)', marginTop: 2 }}>En proceso</div>
+            </div>
+            {/* Por Etapa */}
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-strong)', borderTopColor: 'var(--gold)', borderTopWidth: 2, borderRadius: 8, padding: '14px 16px' }}>
+              <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gold)', lineHeight: 1 }}>{stageBreakdown.length}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginTop: 6 }}>Por Etapa</div>
+              <div style={{ fontSize: 10, color: 'var(--text-mute)', marginTop: 2 }}>
+                {stageBreakdown.slice(0, 2).map(s => `${s.name}: ${s.count}`).join(' · ') || 'Sin datos'}
+              </div>
+            </div>
+            {/* Atrasados */}
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderTopColor: overdueLeads.length > 0 ? '#E04444' : 'var(--border)', borderTopWidth: 2, borderRadius: 8, padding: '14px 16px' }}>
+              <div style={{ fontSize: 26, fontWeight: 700, color: overdueLeads.length > 0 ? '#E04444' : 'var(--text)', lineHeight: 1 }}>{overdueLeads.length}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginTop: 6 }}>Atrasados</div>
+              <div style={{ fontSize: 10, color: 'var(--text-mute)', marginTop: 2 }}>Próx. acción vencida</div>
+            </div>
+            {/* Sin Acción */}
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderTopColor: noActionLeads.length > 5 ? '#E04444' : 'var(--border)', borderTopWidth: 2, borderRadius: 8, padding: '14px 16px' }}>
+              <div style={{ fontSize: 26, fontWeight: 700, color: noActionLeads.length > 5 ? '#E04444' : 'var(--text)', lineHeight: 1 }}>{noActionLeads.length}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginTop: 6 }}>Sin Acción</div>
+              <div style={{ fontSize: 10, color: 'var(--text-mute)', marginTop: 2 }}>Sin fecha definida</div>
+            </div>
+            {/* Ventas */}
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderTopColor: '#22c55e', borderTopWidth: 2, borderRadius: 8, padding: '14px 16px' }}>
+              <div style={{ fontSize: 26, fontWeight: 700, color: '#22c55e', lineHeight: 1 }}>{closedContacts.length}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginTop: 6 }}>Ventas</div>
+              <div style={{ fontSize: 10, color: 'var(--text-mute)', marginTop: 2 }}>Etapa cerrado</div>
+            </div>
+          </div>
+        </div>
+
         {/* KPIs */}
         <div className="kpi-grid">
           <div className="kpi">

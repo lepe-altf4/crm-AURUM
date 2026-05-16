@@ -25,6 +25,7 @@ export interface Contact {
   vendor_id: string | null
   amount: number
   days: number
+  next_action_date: string | null
   created_at: string
   updated_at: string
   stage?: Stage

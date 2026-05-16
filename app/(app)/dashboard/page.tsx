@@ -10,8 +10,9 @@ export default async function DashboardPage() {
     { data: weeklySales },
     { data: profiles },
     { data: recentClosed },
+    { data: stages },
   ] = await Promise.all([
-    supabase.from('leads').select('id, amount, stage_id, vendor_id'),
+    supabase.from('leads').select('id, amount, stage_id, vendor_id, next_action_date'),
     supabase.from('stock').select('id, price, status'),
     supabase.from('weekly_sales').select('*').order('created_at'),
     supabase.from('users').select('id, name, initials').eq('active', true),
@@ -21,6 +22,7 @@ export default async function DashboardPage() {
       .eq('stage_id', 's5')
       .order('updated_at', { ascending: false })
       .limit(5),
+    supabase.from('pipeline_stages').select('id, name, order').order('order'),
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,6 +33,7 @@ export default async function DashboardPage() {
       weeklySales={(weeklySales ?? []) as any[]}
       profiles={(profiles ?? []) as any[]}
       recentClosed={(recentClosed ?? []) as any[]}
+      stages={(stages ?? []) as any[]}
     />
   )
 }
