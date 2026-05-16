@@ -474,22 +474,6 @@ input, select, textarea { font-family: inherit; }
 .deal-days { font-size: 11px; color: var(--text-mute); font-variant-numeric: tabular-nums; }
 .deal-days.warn { color: var(--gold); font-weight: 500; }
 
-/* Stock thumb */
-.thumb {
-  width: 56px; height: 36px;
-  border-radius: 4px;
-  background: linear-gradient(135deg,#181818, #0d0d0d);
-  border: 1px solid var(--border);
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.thumb::before {
-  content: '';
-  position: absolute; inset: 0;
-  background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 4px, transparent 4px 10px);
-}
-.thumb svg { position: absolute; inset: 0; margin: auto; color: var(--text-mute); }
 
 /* KPI */
 .kpi-grid {
