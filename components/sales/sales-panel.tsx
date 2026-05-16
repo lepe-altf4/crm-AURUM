@@ -117,7 +117,7 @@ export default function SalesPanel({ initialLeads, stages, vendors }: Props) {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
           {activeTab === 'pipeline' && (
-            <PipelineView leads={activeLeads} stages={stages} onSelect={setSelectedLead} selected={selectedLead} />
+            <PipelineView leads={leads} stages={stages} onSelect={setSelectedLead} selected={selectedLead} />
           )}
           {activeTab === 'daily' && (
             <DailyView
@@ -255,12 +255,38 @@ function CalendarView({ leads, onSelect }: { leads: Contact[]; onSelect: (l: Con
   const totalWithAction = leads.filter(l => l.next_action_date).length
   const monthLeads = leads.filter(l => {
     if (!l.next_action_date) return false
-    const d = new Date(l.next_action_date)
+    const d = new Date(l.next_action_date + 'T12:00:00')
     return d.getFullYear() === year && d.getMonth() === month
   })
 
+  // Atrasados: cualquier lead con fecha < hoy, siempre visibles sin importar el mes
+  const overdueAll = leads.filter(l => l.next_action_date && l.next_action_date.split('T')[0] < today)
+
   return (
     <div>
+      {/* Banner de atrasados — siempre visible */}
+      {overdueAll.length > 0 && (
+        <div style={{ background: 'rgba(224,68,68,0.08)', border: '1px solid rgba(224,68,68,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span style={{ color: '#E04444', flexShrink: 0, display: 'flex', marginTop: 1 }}><Icon name="alert" size={14} /></span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#E04444', marginBottom: 6 }}>
+              {overdueAll.length} lead{overdueAll.length > 1 ? 's' : ''} atrasado{overdueAll.length > 1 ? 's' : ''}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {overdueAll.map(l => (
+                <button
+                  key={l.id}
+                  onClick={() => onSelect(l)}
+                  style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(224,68,68,0.15)', border: '1px solid rgba(224,68,68,0.4)', color: '#E04444', cursor: 'pointer' }}
+                >
+                  {l.name} · {new Date(l.next_action_date! + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Calendar header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

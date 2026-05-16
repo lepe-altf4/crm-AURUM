@@ -103,16 +103,6 @@ export default function StockManager({ initialInventory, contacts }: Props) {
     startTransition(() => router.refresh())
   }
 
-  function Thumb() {
-    return (
-      <div className="thumb">
-        <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 13l2-6h14l2 6" /><path d="M3 13v5h2v-2h14v2h2v-5" /><path d="M3 13h18" />
-        </svg>
-      </div>
-    )
-  }
-
   return (
     <>
       <div className="module-header">
@@ -151,7 +141,6 @@ export default function StockManager({ initialInventory, contacts }: Props) {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: 76 }} />
                   <th style={{ fontWeight: 600 }}>Marca</th>
                   <th style={{ fontWeight: 600 }}>Modelo</th>
                   <th style={{ fontWeight: 600 }}>Año</th>
@@ -164,7 +153,6 @@ export default function StockManager({ initialInventory, contacts }: Props) {
               <tbody>
                 {filtered.map(u => (
                   <tr key={u.id} style={{ cursor: 'pointer' }} onClick={() => setDrawerItem(u)}>
-                    <td><Thumb /></td>
                     <td style={{ fontWeight: 500 }}>{u.brand}</td>
                     <td className="muted">{u.model}</td>
                     <td className="muted tabular">{u.year}</td>

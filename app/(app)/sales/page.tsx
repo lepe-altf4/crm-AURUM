@@ -13,7 +13,7 @@ export default async function SalesPage() {
       .from('leads')
       .select('*, stage:pipeline_stages(*), vendor:users(*)')
       .order('updated_at', { ascending: false }),
-    supabase.from('pipeline_stages').select('*').order('order'),
+    supabase.from('pipeline_stages').select('*').order('position'),
     supabase.from('users').select('id, name, initials, role').eq('active', true),
   ])
 
