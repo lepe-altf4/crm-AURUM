@@ -9,7 +9,7 @@ import { StageBadge } from '@/components/ui/badge'
 import ActivityTimeline from '@/components/activities/activity-timeline'
 import type { Contact, Stage, Profile } from '@/lib/types'
 
-const ORIGINS = ['Meli', 'IG', 'Referido', 'Web'] as const
+const ORIGINS = ['WhatsApp', 'Meli', 'IG', 'Web', 'Referido'] as const
 
 interface LeadsHubProps {
   initialContacts: Contact[]
@@ -113,7 +113,7 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
     startTransition(() => router.refresh())
   }
 
-  const originDotClass: Record<string, string> = { Meli: 'dot-meli', IG: 'dot-ig', Referido: 'dot-ref', Web: 'dot-web' }
+  const originDotClass: Record<string, string> = { WhatsApp: 'dot-wa', Meli: 'dot-meli', IG: 'dot-ig', Referido: 'dot-ref', Web: 'dot-web' }
 
   return (
     <>
@@ -174,12 +174,15 @@ export default function LeadsHub({ initialContacts, stages, vendors }: LeadsHubP
                 {filtered.map(c => (
                   <tr key={c.id}>
                     <td style={{ padding: '13px 14px', fontWeight: 400 }}>
-                      <button
-                        style={{ fontWeight: 500, background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', padding: 0, textAlign: 'left' }}
-                        onClick={() => setDetailContact(c)}
-                      >
-                        {c.name}
-                      </button>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          style={{ fontWeight: 500, background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+                          onClick={() => setDetailContact(c)}
+                        >
+                          {c.name}
+                        </button>
+                        {c.hot && <span className="badge-hot">🔥 HOT</span>}
+                      </span>
                     </td>
                     <td className="muted tabular" style={{ padding: '13px 14px', fontWeight: 400 }}>{c.phone}</td>
                     <td style={{ padding: '13px 14px', fontWeight: 400 }}>

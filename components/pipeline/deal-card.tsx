@@ -29,7 +29,10 @@ export default function DealCard({ contact, vendors, overlay = false }: Props) {
       {...(overlay ? {} : { ...listeners, ...attributes })}
       className={`deal${isDragging && !overlay ? ' dragging' : ''}`}
     >
-      <div className="deal-name">{contact.name}</div>
+      <div className="deal-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span>{contact.name}</span>
+        {contact.hot && <span className="badge-hot">🔥 HOT</span>}
+      </div>
       <div className="deal-car">{contact.car_interest ?? '—'}</div>
       <div className="deal-foot">
         <div className="deal-vendor">

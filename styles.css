@@ -348,6 +348,22 @@ input, select, textarea { font-family: inherit; }
 .badge-white { color: var(--text); border-color: var(--border-strong); background: transparent; }
 .badge-mute { color: var(--text-mute); border-color: var(--border); background: var(--surface-3); }
 .badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.badge-hot {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  border-radius: 100px;
+  color: #ff5a3c;
+  border: 1px solid rgba(255,90,60,0.38);
+  background: rgba(255,90,60,0.10);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
 
 /* Drawer */
 .drawer-backdrop {
@@ -667,6 +683,7 @@ input, select, textarea { font-family: inherit; }
 .dot-ig { background: #c4c4c4; }
 .dot-ref { background: var(--text); }
 .dot-web { background: var(--text-mute); }
+.dot-wa { background: #25D366; }
 
 /* Spec list */
 .spec-row {

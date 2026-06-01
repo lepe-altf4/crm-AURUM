@@ -25,6 +25,7 @@ export interface Contact {
   vendor_id: string | null
   amount: number
   days: number
+  hot: boolean
   next_action_date: string | null
   created_at: string
   updated_at: string
@@ -92,6 +93,6 @@ export interface WeeklySale {
   created_at: string
 }
 
-export type Origin = 'Meli' | 'IG' | 'Referido' | 'Web'
+export type Origin = 'Meli' | 'IG' | 'Referido' | 'Web' | 'WhatsApp'
 export type StockStatus = 'available' | 'reserved' | 'sold'
 export type ActivityType = 'note' | 'call' | 'email' | 'meeting' | 'stage_change'
